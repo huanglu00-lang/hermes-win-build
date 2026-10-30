@@ -21,11 +21,13 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '26'
 
       - name: Toolchain
         run: |
           node -v
+          npm -v
+          npm install -g npm@^11.19.0
           npm -v
 
       - name: Install (monorepo)
