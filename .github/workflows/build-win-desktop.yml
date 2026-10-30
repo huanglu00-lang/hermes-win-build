@@ -1,0 +1,60 @@
+name: build-win-desktop
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/build-win-desktop.yml', 'GO']
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: NousResearch/hermes-agent
+          fetch-depth: 1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Toolchain
+        run: |
+          node -v
+          npm -v
+
+      - name: Install (monorepo)
+        run: npm ci --no-audit --no-fund
+        env:
+          npm_config_registry: https://registry.npmmirror.com
+
+      - name: Build renderer + main
+        run: npm run build --workspace apps/desktop
+        env:
+          npm_config_registry: https://registry.npmmirror.com
+
+      - name: Package win32-x64 zip
+        working-directory: apps/desktop
+        run: node scripts/run-electron-builder.mjs --win zip --publish never
+        env:
+          ELECTRON_MIRROR: https://npmmirror.com/mirrors/electron/
+          ELECTRON_BUILDER_BINARIES_MIRROR: https://npmmirror.com/mirrors/electron-builder-binaries/
+          npm_config_registry: https://registry.npmmirror.com
+
+      - name: Show artifacts
+        shell: pwsh
+        run: Get-ChildItem apps\desktop\release -Recurse -Depth 1 | Where-Object { -not $_.PSIsContainer } | Select-Object FullName,Length | Format-Table -AutoSize
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hermes-desktop-win64
+          path: |
+            apps/desktop/release/*.zip
+            apps/desktop/release/win-unpacked/**
+          if-no-files-found: error
+          retention-days: 14
